@@ -30,7 +30,7 @@ export async function GET() {
     return NextResponse.json(
       {
         user: {
-          id: user._id,
+          id: user._id.toString(), // Convert to string for consistency
           email: user.email,
           name: user.name,
           role: user.role,

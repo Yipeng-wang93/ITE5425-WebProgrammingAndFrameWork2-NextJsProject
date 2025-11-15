@@ -1,17 +1,26 @@
-// Root layout with authentication context
+// Root layout with providers
 
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
-import { AuthProvider } from '@/contexts/AuthContext';
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { CartProvider } from "@/contexts/Cartcontext";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 
-const inter = Inter({ subsets: ['latin'] });
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
-  title: 'Grab A Food - Restaurant Ordering Platform',
-  description: 'Discover and order from the best local restaurants',
+  title: "FoodDelivery - Order Your Favorite Meals",
+  description: "Discover and order from the best local restaurants",
 };
 
 export default function RootLayout({
@@ -21,11 +30,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} flex flex-col min-h-screen`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
         <AuthProvider>
-          <Navbar />
-          <main className="flex-grow">{children}</main>
-          <Footer />
+          <CartProvider>
+            <div className="flex flex-col min-h-screen">
+              <Navbar />
+              <main className="flex-grow">
+                {children}
+              </main>
+              <Footer />
+            </div>
+          </CartProvider>
         </AuthProvider>
       </body>
     </html>

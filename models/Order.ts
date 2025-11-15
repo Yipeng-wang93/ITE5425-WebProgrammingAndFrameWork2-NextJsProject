@@ -17,6 +17,7 @@ export interface IOrder extends Document {
   totalAmount: number;
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
   deliveryAddress: string;
+  phone: string;
   specialInstructions?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -82,6 +83,11 @@ const OrderSchema = new Schema<IOrder>(
     deliveryAddress: {
       type: String,
       required: [true, 'Delivery address is required'],
+      trim: true,
+    },
+    phone: {
+      type: String,
+      required: [true, 'Phone number is required'],
       trim: true,
     },
     specialInstructions: {

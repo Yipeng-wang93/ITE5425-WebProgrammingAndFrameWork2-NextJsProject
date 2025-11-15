@@ -1,214 +1,168 @@
-// Order listing and creation endpoints
+// API route for creating new orders and fetching user's order history
+// CUSTOMER ONLY - Partners cannot place orders or view order history
 
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
-import MenuItem from '@/models/MenuItem';
-import Restaurant from '@/models/Restaurant';
-import User from '@/models/User';
-import { getCurrentUser } from '@/lib/auth';
+import { verifyAuth } from '@/lib/auth';
 
-// GET - Fetch orders for current user or restaurant
-export async function GET(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const currentUser = await getCurrentUser();
-
-    if (!currentUser) {
+    // Verify authentication
+    const authResult = await verifyAuth(req);
+    if (!authResult.authenticated || !authResult.user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
 
-    await dbConnect();
-
-    const { searchParams } = new URL(request.url);
-    const restaurantId = searchParams.get('restaurantId');
-
-    let query: any = {};
-
-    if (restaurantId) {
-      // Partner viewing orders for their restaurant
-      const restaurant = await Restaurant.findById(restaurantId);
-      if (!restaurant) {
-        return NextResponse.json(
-          { error: 'Restaurant not found' },
-          { status: 404 }
-        );
-      }
-
-      if (restaurant.ownerUserId.toString() !== currentUser.userId) {
-        return NextResponse.json(
-          { error: 'You can only view orders for your own restaurants' },
-          { status: 403 }
-        );
-      }
-
-      query.restaurantId = restaurantId;
-    } else {
-      // Customer viewing their own orders
-      query.userId = currentUser.userId;
-    }
-
-    const orders = await Order.find(query)
-      .sort({ createdAt: -1 })
-      .populate('restaurantId', 'name address')
-      .populate('userId', 'name email');
-
-    return NextResponse.json(
-      {
-        orders: orders.map((order) => ({
-          id: order._id,
-          userId: order.userId,
-          restaurantId: order.restaurantId,
-          items: order.items,
-          totalAmount: order.totalAmount,
-          status: order.status,
-          deliveryAddress: order.deliveryAddress,
-          specialInstructions: order.specialInstructions,
-          createdAt: order.createdAt,
-        })),
-      },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error('Get orders error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch orders' },
-      { status: 500 }
-    );
-  }
-}
-
-// POST - Create new order
-export async function POST(request: NextRequest) {
-  try {
-    const currentUser = await getCurrentUser();
-
-    if (!currentUser) {
+    // Only customers can create orders
+    if (authResult.user.role !== 'customer') {
       return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
+        { error: 'Only customers can place orders' },
+        { status: 403 }
       );
     }
 
     await dbConnect();
 
-    const body = await request.json();
-    const { restaurantId, items, deliveryAddress, specialInstructions } = body;
+    const body = await req.json();
+    const { restaurantId, items, deliveryAddress, phone, specialInstructions, totalAmount } = body;
 
     // Validation
-    if (!restaurantId || !items || !deliveryAddress) {
+    if (!restaurantId) {
       return NextResponse.json(
-        { error: 'Restaurant ID, items, and delivery address are required' },
+        { error: 'Restaurant ID is required' },
         { status: 400 }
       );
     }
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: 'Order must contain at least one item' },
         { status: 400 }
       );
     }
 
-    // Check if restaurant exists
-    const restaurant = await Restaurant.findById(restaurantId);
-    if (!restaurant) {
-      return NextResponse.json(
-        { error: 'Restaurant not found' },
-        { status: 404 }
-      );
-    }
-
-    // Verify all menu items exist and calculate total
-    const orderItems = [];
-    let totalAmount = 0;
-
-    for (const item of items) {
-      if (!item.menuItemId || !item.quantity || item.quantity < 1) {
-        return NextResponse.json(
-          { error: 'Each item must have a valid menu item ID and quantity' },
-          { status: 400 }
-        );
-      }
-
-      const menuItem = await MenuItem.findById(item.menuItemId);
-      if (!menuItem) {
-        return NextResponse.json(
-          { error: `Menu item ${item.menuItemId} not found` },
-          { status: 404 }
-        );
-      }
-
-      if (menuItem.restaurantId.toString() !== restaurantId) {
-        return NextResponse.json(
-          { error: 'All menu items must belong to the same restaurant' },
-          { status: 400 }
-        );
-      }
-
-      if (!menuItem.isAvailable) {
-        return NextResponse.json(
-          { error: `Menu item ${menuItem.name} is currently unavailable` },
-          { status: 400 }
-        );
-      }
-
-      const itemTotal = menuItem.price * item.quantity;
-      totalAmount += itemTotal;
-
-      orderItems.push({
-        menuItemId: menuItem._id,
-        name: menuItem.name,
-        price: menuItem.price,
-        quantity: item.quantity,
-      });
-    }
-
-    // Get user for delivery address fallback
-    const user = await User.findById(currentUser.userId);
-    const finalDeliveryAddress = deliveryAddress || user?.address || '';
-
-    if (!finalDeliveryAddress) {
+    if (!deliveryAddress || deliveryAddress.trim() === '') {
       return NextResponse.json(
         { error: 'Delivery address is required' },
         { status: 400 }
       );
     }
 
+    if (!phone || phone.trim() === '') {
+      return NextResponse.json(
+        { error: 'Phone number is required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate items structure
+    for (const item of items) {
+      if (!item.menuItemId || !item.name || item.price === undefined || !item.quantity) {
+        return NextResponse.json(
+          { error: 'Invalid item data' },
+          { status: 400 }
+        );
+      }
+      if (item.quantity < 1) {
+        return NextResponse.json(
+          { error: 'Item quantity must be at least 1' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Calculate total to verify
+    const calculatedTotal = items.reduce(
+      (sum, item) => sum + (item.price * item.quantity),
+      0
+    );
+
+    if (Math.abs(calculatedTotal - totalAmount) > 0.01) {
+      return NextResponse.json(
+        { error: 'Total amount mismatch' },
+        { status: 400 }
+      );
+    }
+
     // Create order
     const order = await Order.create({
-      userId: currentUser.userId,
+      userId: authResult.user.id,
       restaurantId,
-      items: orderItems,
-      totalAmount: Math.round(totalAmount * 100) / 100, // Round to 2 decimal places
+      items,
+      totalAmount,
+      deliveryAddress: deliveryAddress.trim(),
+      phone: phone.trim(),
+      specialInstructions: specialInstructions?.trim() || '',
       status: 'pending',
-      deliveryAddress: finalDeliveryAddress,
-      specialInstructions: specialInstructions || '',
     });
 
+    // Populate order with user and restaurant details
+    await order.populate('userId', 'name email phone');
+    await order.populate('restaurantId', 'name address phone');
+
     return NextResponse.json(
-      {
-        message: 'Order created successfully',
+      { 
+        message: 'Order created successfully', 
         order: {
-          id: order._id,
-          userId: order.userId,
+          _id: order._id,
           restaurantId: order.restaurantId,
           items: order.items,
           totalAmount: order.totalAmount,
           status: order.status,
           deliveryAddress: order.deliveryAddress,
+          phone: order.phone,
           specialInstructions: order.specialInstructions,
           createdAt: order.createdAt,
-        },
+        }
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error('Create order error:', error);
+  } catch (error) {
+    console.error('Order creation error:', error);
     return NextResponse.json(
       { error: 'Failed to create order' },
+      { status: 500 }
+    );
+  }
+}
+
+// GET - Fetch user's personal order history (CUSTOMER ONLY)
+export async function GET(req: NextRequest) {
+  try {
+    // Verify authentication
+    const authResult = await verifyAuth(req);
+    if (!authResult.authenticated || !authResult.user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // Only customers can view order history (their own orders)
+    if (authResult.user.role !== 'customer') {
+      return NextResponse.json(
+        { error: 'Only customers can view order history. Partners should use the restaurant management interface.' },
+        { status: 403 }
+      );
+    }
+
+    await dbConnect();
+
+    // Fetch only this user's orders (user-specific)
+    const orders = await Order.find({ userId: authResult.user.id })
+      .populate('restaurantId', 'name address imageUrl')
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    return NextResponse.json({ orders });
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch orders' },
       { status: 500 }
     );
   }

@@ -1,13 +1,17 @@
 // Container component for displaying multiple reviews
 
+'use client';
+
 import { Review } from '@/types';
 import ReviewCard from './ReviewCard';
 
 interface ReviewListProps {
   reviews: Review[];
+  onEdit?: (reviewId: string) => void;
+  onDelete?: (reviewId: string) => void;
 }
 
-export default function ReviewList({ reviews }: ReviewListProps) {
+export default function ReviewList({ reviews, onEdit, onDelete }: ReviewListProps) {
   if (reviews.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-md p-8 text-center">
@@ -49,7 +53,12 @@ export default function ReviewList({ reviews }: ReviewListProps) {
 
       <div className="space-y-4">
         {reviews.map((review) => (
-          <ReviewCard key={review.id} review={review} />
+          <ReviewCard 
+            key={review.id} 
+            review={review} 
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
         ))}
       </div>
     </div>

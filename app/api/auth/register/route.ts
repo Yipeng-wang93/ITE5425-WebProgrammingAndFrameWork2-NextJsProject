@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       {
         message: 'User registered successfully',
         user: {
-          id: user._id,
+          id: user._id.toString(), // Convert to string for consistency
           email: user.email,
           name: user.name,
           role: user.role,

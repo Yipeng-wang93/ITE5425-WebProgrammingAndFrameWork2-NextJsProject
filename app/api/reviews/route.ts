@@ -1,4 +1,5 @@
 // Review listing and creation endpoints
+// FIXED: Only customers can create reviews
 
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
@@ -23,19 +24,18 @@ export async function GET(request: NextRequest) {
     }
 
     const reviews = await Review.find({ restaurantId })
-      .sort({ createdAt: -1 })
-      .populate('userId', 'name'); // or .populate('userId', 'name email') if email needed
+      .sort({ createdAt: -1 });
 
     return NextResponse.json(
       {
         reviews: reviews.map((r) => ({
-          id: r._id,
-          restaurantId: r.restaurantId,
-          userId: r.userId,
+          id: r._id.toString(),
+          restaurantId: r.restaurantId.toString(),
+          userId: r.userId.toString(), // Convert to string for comparison
           userName: r.userName,
           rating: r.rating,
           comment: r.comment,
-          createdAt: r.createdAt,
+          createdAt: r.createdAt.toISOString(),
         })),
       },
       { status: 200 }
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new review (authenticated users only)
+// POST - Create new review (authenticated CUSTOMERS only)
 export async function POST(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser();
@@ -58,6 +58,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
+      );
+    }
+
+    // FIXED: Only customers can create reviews
+    if (currentUser.role !== 'customer') {
+      return NextResponse.json(
+        { error: 'Only customers can write reviews' },
+        { status: 403 }
       );
     }
 

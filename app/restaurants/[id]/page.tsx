@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import RestaurantDetail from '@/components/restaurants/RestaurantDetail';
 import ReviewList from '@/components/reviews/ReviewList';
 import ReviewForm from '@/components/reviews/ReviewForm';
+import EditReviewModal from '@/components/reviews/Editreviewmodal';
 import { Restaurant, Review } from '@/types';
 
 interface RestaurantPageProps {
@@ -18,8 +19,11 @@ export default function RestaurantPage({ params }: RestaurantPageProps) {
   const { user } = useAuth();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [menuItems, setMenuItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [restaurantId, setRestaurantId] = useState<string>('');
+  const [editingReview, setEditingReview] = useState<Review | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     params.then(({ id }) => {
@@ -48,6 +52,14 @@ export default function RestaurantPage({ params }: RestaurantPageProps) {
       if (reviewsResponse.ok) {
         setReviews(reviewsData.reviews);
       }
+
+      // Fetch menu items
+      const menuResponse = await fetch(`/api/menuitems?restaurantId=${id}`);
+      const menuData = await menuResponse.json();
+
+      if (menuResponse.ok) {
+        setMenuItems(menuData.menuItems);
+      }
     } catch (error) {
       console.error('Error fetching restaurant data:', error);
       setRestaurant(null);
@@ -58,6 +70,29 @@ export default function RestaurantPage({ params }: RestaurantPageProps) {
 
   const handleReviewSubmitted = () => {
     fetchRestaurantData(restaurantId);
+  };
+
+  const handleEditReview = (reviewId: string) => {
+    const review = reviews.find(r => r.id === reviewId);
+    if (review) {
+      setEditingReview(review);
+      setIsEditModalOpen(true);
+    }
+  };
+
+  const handleDeleteReview = () => {
+    // Refresh reviews after deletion
+    fetchRestaurantData(restaurantId);
+  };
+
+  const handleEditSuccess = () => {
+    // Refresh reviews after edit
+    fetchRestaurantData(restaurantId);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingReview(null);
   };
 
   if (loading) {
@@ -74,12 +109,16 @@ export default function RestaurantPage({ params }: RestaurantPageProps) {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <RestaurantDetail restaurant={restaurant} />
+      <RestaurantDetail restaurant={restaurant} menuItems={menuItems} />
 
       <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <h2 className="text-3xl font-bold text-gray-800 mb-6">Customer Reviews</h2>
-          <ReviewList reviews={reviews} />
+          <ReviewList 
+            reviews={reviews}
+            onEdit={handleEditReview}
+            onDelete={handleDeleteReview}
+          />
         </div>
 
         <div className="lg:col-span-1">
@@ -101,6 +140,16 @@ export default function RestaurantPage({ params }: RestaurantPageProps) {
           )}
         </div>
       </div>
+
+      {/* Edit Review Modal */}
+      {editingReview && (
+        <EditReviewModal
+          review={editingReview}
+          isOpen={isEditModalOpen}
+          onClose={handleCloseEditModal}
+          onSuccess={handleEditSuccess}
+        />
+      )}
     </div>
   );
 }

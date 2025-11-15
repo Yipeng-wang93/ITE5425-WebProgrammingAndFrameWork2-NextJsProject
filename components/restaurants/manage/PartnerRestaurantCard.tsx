@@ -65,25 +65,32 @@ export default function PartnerRestaurantCard({ restaurant, onUpdate }: PartnerR
         <p className="text-gray-600 text-sm mb-2">{restaurant.cuisine} • {priceSymbols}</p>
         <p className="text-gray-500 text-sm mb-4 line-clamp-2">{restaurant.description}</p>
 
-        <div className="flex gap-2">
-          <Link href={`/restaurants/manage/${restaurant.id}/edit`} className="flex-1">
-            <Button variant="primary" className="w-full">
-              Edit
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Link href={`/restaurants/manage/${restaurant.id}/edit`} className="flex-1">
+              <Button variant="primary" className="w-full">
+                Edit
+              </Button>
+            </Link>
+            <Link href={`/restaurants/${restaurant.id}`} className="flex-1">
+              <Button variant="secondary" className="w-full">
+                View
+              </Button>
+            </Link>
+            <Button 
+              variant="danger" 
+              onClick={handleDelete} 
+              disabled={isDeleting}
+              className="px-3"
+            >
+              {isDeleting ? '...' : 'Delete'}
             </Button>
-          </Link>
-          <Link href={`/restaurants/${restaurant.id}`} className="flex-1">
+          </div>
+          <Link href={`/restaurants/manage/${restaurant.id}/menu`} className="block">
             <Button variant="secondary" className="w-full">
-              View
+              🍽️ Manage Menu
             </Button>
           </Link>
-          <Button 
-            variant="danger" 
-            onClick={handleDelete} 
-            disabled={isDeleting}
-            className="px-3"
-          >
-            {isDeleting ? '...' : 'Delete'}
-          </Button>
         </div>
       </div>
     </div>

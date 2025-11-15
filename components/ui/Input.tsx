@@ -8,6 +8,7 @@ interface InputProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   placeholder?: string;
   required?: boolean;
+  disabled?: boolean;
   error?: string;
 }
 
@@ -19,6 +20,7 @@ export default function Input({
   onChange,
   placeholder,
   required = false,
+  disabled = false,
   error,
 }: InputProps) {
   return (
@@ -34,9 +36,10 @@ export default function Input({
         onChange={onChange}
         placeholder={placeholder}
         required={required}
+        disabled={disabled}
         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
           error ? 'border-red-500' : 'border-gray-300'
-        }`}
+        } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
       />
       {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
     </div>

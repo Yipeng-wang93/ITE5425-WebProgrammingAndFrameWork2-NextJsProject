@@ -75,3 +75,37 @@ export async function getCurrentUser(): Promise<JWTPayload | null> {
   if (!token) return null;
   return verifyToken(token);
 }
+
+// Verify authentication from NextRequest (for API routes)
+export async function verifyAuth(req: any): Promise<{
+  authenticated: boolean;
+  user: { id: string; email: string; role: 'customer' | 'partner' } | null;
+}> {
+  try {
+    // Get token from cookies
+    const token = req.cookies.get('auth-token')?.value;
+    
+    if (!token) {
+      return { authenticated: false, user: null };
+    }
+
+    // Verify token
+    const decoded = verifyToken(token);
+    
+    if (!decoded) {
+      return { authenticated: false, user: null };
+    }
+
+    return {
+      authenticated: true,
+      user: {
+        id: decoded.userId,
+        email: decoded.email,
+        role: decoded.role,
+      },
+    };
+  } catch (error) {
+    console.error('Auth verification error:', error);
+    return { authenticated: false, user: null };
+  }
+}
