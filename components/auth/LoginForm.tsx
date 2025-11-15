@@ -1,29 +1,32 @@
-// Login form component with validation
+// Login form with API integration
 
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { AuthFormData } from '@/types';
 
 export default function LoginForm() {
   const router = useRouter();
+  const { login } = useAuth();
   const [formData, setFormData] = useState<AuthFormData>({
     email: '',
     password: '',
   });
   const [errors, setErrors] = useState<Partial<AuthFormData>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    // Clear error for this field when user starts typing
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name as keyof AuthFormData]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: '' }));
     }
+    setApiError('');
   };
 
   const validateForm = (): boolean => {
@@ -53,18 +56,26 @@ export default function LoginForm() {
     }
 
     setIsLoading(true);
+    setApiError('');
 
-    // Mock API call for Phase 1
-    setTimeout(() => {
-      console.log('Login submitted:', formData);
-      // In Phase 2, this will call: await fetch('/api/auth/login', ...)
+    try {
+      await login(formData.email, formData.password);
       router.push('/restaurants');
+    } catch (error: any) {
+      setApiError(error.message || 'Login failed. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {apiError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-600">{apiError}</p>
+        </div>
+      )}
+
       <Input
         label="Email"
         type="email"

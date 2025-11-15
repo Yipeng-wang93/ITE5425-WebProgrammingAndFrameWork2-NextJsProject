@@ -1,9 +1,10 @@
-// Registration form component with validation
+// Registration form with API integration and role selection
 
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { AuthFormData } from '@/types';
@@ -11,25 +12,30 @@ import { AuthFormData } from '@/types';
 interface RegisterFormData extends AuthFormData {
   name: string;
   confirmPassword: string;
+  role: 'customer' | 'partner';
 }
 
 export default function RegisterForm() {
   const router = useRouter();
+  const { register } = useAuth();
   const [formData, setFormData] = useState<RegisterFormData>({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
+    role: 'customer',
   });
   const [errors, setErrors] = useState<Partial<RegisterFormData>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name as keyof RegisterFormData]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: '' }));
     }
+    setApiError('');
   };
 
   const validateForm = (): boolean => {
@@ -71,25 +77,33 @@ export default function RegisterForm() {
     }
 
     setIsLoading(true);
+    setApiError('');
 
-    // Mock API call for Phase 1
-    setTimeout(() => {
-      console.log('Registration submitted:', formData);
-      // In Phase 2, this will call: await fetch('/api/auth/register', ...)
-      router.push('/login');
+    try {
+      await register(formData.email, formData.password, formData.name, formData.role);
+      router.push('/restaurants');
+    } catch (error: any) {
+      setApiError(error.message || 'Registration failed. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {apiError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-600">{apiError}</p>
+        </div>
+      )}
+
       <Input
         label="Full Name"
         type="text"
         name="name"
         value={formData.name}
         onChange={handleChange}
-        placeholder="Please enter your full name"
+        placeholder="Yipeng Wang"
         required
         error={errors.name}
       />
@@ -104,6 +118,22 @@ export default function RegisterForm() {
         required
         error={errors.email}
       />
+
+      <div className="mb-4">
+        <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
+          Account Type <span className="text-red-500">*</span>
+        </label>
+        <select
+          id="role"
+          name="role"
+          value={formData.role}
+          onChange={handleChange}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+        >
+          <option value="customer">Customer - Browse and order food</option>
+          <option value="partner">Partner - Manage restaurants</option>
+        </select>
+      </div>
 
       <Input
         label="Password"

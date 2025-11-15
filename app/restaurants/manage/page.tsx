@@ -1,22 +1,70 @@
-// Partner dashboard for managing restaurants
+// app/restaurants/manage/page.tsx
+// Partner dashboard with API integration
 
 'use client';
 
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import PartnerRestaurantCard from '@/components/restaurants/manage/PartnerRestaurantCard';
 import Button from '@/components/ui/Button';
-import { mockRestaurants, mockCurrentPartnerId } from '@/lib/mockData';
+import { Restaurant } from '@/types';
 
 export default function ManageRestaurantsPage() {
-  // const [restaurants] = useState(mockRestaurants.slice(0, 2));
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  //client-side filtering operation that currently filters mockRestaurants based on 
-  // mockCurrentPartnerId will be entirely replaced by an API call that fetches 
-  // already-filtered data from our backend. 
-    const [restaurants] = useState(
-        mockRestaurants.filter(r => r.ownerUserId === mockCurrentPartnerId)
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+
+    if (user && user.role !== 'partner') {
+      router.push('/');
+    }
+
+    if (user && user.role === 'partner') {
+      fetchRestaurants();
+    }
+  }, [user, authLoading, router]);
+
+  const fetchRestaurants = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/restaurants/manage', {
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setRestaurants(data.restaurants);
+      } else {
+        console.error('Failed to fetch restaurants:', data.error);
+        setRestaurants([]);
+      }
+    } catch (error) {
+      console.error('Error fetching restaurants:', error);
+      setRestaurants([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-orange-50 flex items-center justify-center">
+        <div className="text-xl text-gray-600">Loading...</div>
+      </div>
     );
+  }
+
+  if (!user || user.role !== 'partner') {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-orange-50 py-12 px-4">
@@ -36,7 +84,7 @@ export default function ManageRestaurantsPage() {
         {restaurants.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {restaurants.map((restaurant) => (
-              <PartnerRestaurantCard key={restaurant.id} restaurant={restaurant} />
+              <PartnerRestaurantCard key={restaurant.id} restaurant={restaurant} onUpdate={fetchRestaurants} />
             ))}
           </div>
         ) : (

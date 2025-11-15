@@ -1,8 +1,9 @@
-// Review submission form component
+// Review submission form with API integration
 
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import Button from '@/components/ui/Button';
 
 interface ReviewFormProps {
@@ -11,15 +12,18 @@ interface ReviewFormProps {
 }
 
 export default function ReviewForm({ restaurantId, onSubmitSuccess }: ReviewFormProps) {
+  const { user } = useAuth();
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess(false);
 
     if (rating === 0) {
       setError('Please select a rating');
@@ -33,23 +37,55 @@ export default function ReviewForm({ restaurantId, onSubmitSuccess }: ReviewForm
 
     setIsLoading(true);
 
-    // Mock API call for Phase 1
-    setTimeout(() => {
-      console.log('Review submitted:', { restaurantId, rating, comment });
+    try {
+      const response = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          restaurantId,
+          rating,
+          comment: comment.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit review');
+      }
+
+      setSuccess(true);
       setRating(0);
       setComment('');
+      
+      setTimeout(() => {
+        setSuccess(false);
+        if (onSubmitSuccess) {
+          onSubmitSuccess();
+        }
+      }, 2000);
+    } catch (error: any) {
+      setError(error.message || 'Failed to submit review. Please try again.');
+    } finally {
       setIsLoading(false);
-      if (onSubmitSuccess) {
-        onSubmitSuccess();
-      }
-      alert('Review submitted successfully!');
-    }, 1000);
+    }
   };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <h3 className="text-2xl font-bold text-gray-800 mb-6">Write a Review</h3>
       
+      {success && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-sm text-green-600">Review submitted successfully!</p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-3">

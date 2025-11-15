@@ -1,36 +1,95 @@
-// User profile management page
+// User profile management page with API integration
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
-import { mockUserProfile } from '@/lib/mockData';
-import { UserProfile } from '@/types';
 
 export default function ProfilePage() {
-  const [formData, setFormData] = useState<UserProfile>(mockUserProfile);
+  const router = useRouter();
+  const { user, loading: authLoading, refreshUser } = useAuth();
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    displayName: '',
+    phone: '',
+    address: '',
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        displayName: user.displayName || '',
+        phone: user.phone || '',
+        address: user.address || '',
+      });
+    }
+  }, [user, authLoading, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setSuccessMessage('');
+    setErrorMessage('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setSuccessMessage('');
+    setErrorMessage('');
 
-    // Mock API call for Phase 1
-    setTimeout(() => {
-      console.log('Profile updated:', formData);
-      setIsLoading(false);
+    try {
+      const response = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: formData.name,
+          displayName: formData.displayName,
+          phone: formData.phone,
+          address: formData.address,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update profile');
+      }
+
       setSuccessMessage('Profile updated successfully!');
-      // In Phase 2, this will call: await fetch('/api/profile', ...)
-    }, 1000);
+      await refreshUser();
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Failed to update profile. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-orange-50 flex items-center justify-center">
+        <div className="text-xl text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-orange-50 py-12 px-4">
@@ -47,6 +106,12 @@ export default function ProfilePage() {
             </div>
           )}
 
+          {errorMessage && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600">{errorMessage}</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <Input
@@ -55,7 +120,7 @@ export default function ProfilePage() {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder="Please enter your full name"
+                placeholder="Yipeng Wang"
                 required
               />
 
@@ -63,7 +128,7 @@ export default function ProfilePage() {
                 label="Display Name"
                 type="text"
                 name="displayName"
-                value={formData.displayName || ''}
+                value={formData.displayName}
                 onChange={handleChange}
                 placeholder="Username or nickname"
               />
@@ -80,7 +145,7 @@ export default function ProfilePage() {
                 required
               />
               <p className="mt-1 text-sm text-gray-500">
-                Your email address is used for login and notifications
+                Email address cannot be changed
               </p>
             </div>
 
@@ -89,15 +154,15 @@ export default function ProfilePage() {
                 label="Phone Number"
                 type="tel"
                 name="phone"
-                value={formData.phone || ''}
+                value={formData.phone}
                 onChange={handleChange}
-                placeholder="(123) 456-7890"
+                placeholder="(416) 123-4567"
               />
 
               <div className="flex items-center">
                 <div className="bg-orange-50 px-4 py-3 rounded-lg">
                   <p className="text-sm font-medium text-gray-700">Account Type</p>
-                  <p className="text-lg font-semibold text-orange-600 capitalize">{formData.role}</p>
+                  <p className="text-lg font-semibold text-orange-600 capitalize">{user.role}</p>
                 </div>
               </div>
             </div>
@@ -107,9 +172,9 @@ export default function ProfilePage() {
                 label="Address"
                 type="text"
                 name="address"
-                value={formData.address || ''}
+                value={formData.address}
                 onChange={handleChange}
-                placeholder="Your street, City, Province, Postal Code"
+                placeholder="123567 Yipeng Test Street, Toronto, ON"
               />
             </div>
 
@@ -120,20 +185,24 @@ export default function ProfilePage() {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => setFormData(mockUserProfile)}
+                onClick={() => {
+                  if (user) {
+                    setFormData({
+                      name: user.name || '',
+                      email: user.email || '',
+                      displayName: user.displayName || '',
+                      phone: user.phone || '',
+                      address: user.address || '',
+                    });
+                  }
+                  setSuccessMessage('');
+                  setErrorMessage('');
+                }}
               >
                 Reset
               </Button>
             </div>
           </form>
-        </div>
-
-        <div className="mt-8 bg-white rounded-lg shadow-md p-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Account Security</h2>
-          <p className="text-gray-600 mb-6">
-            Manage your password and security settings to keep your account secure.
-          </p>
-          <Button variant="secondary">Change Password</Button>
         </div>
       </div>
     </div>

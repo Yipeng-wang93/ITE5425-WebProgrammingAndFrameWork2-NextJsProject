@@ -1,35 +1,65 @@
-// Restaurant creation page for partners
+// Restaurant creation page with API integration
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import RestaurantForm from '@/components/restaurants/manage/RestaurantForm';
 import { Restaurant } from '@/types';
-import { mockCurrentPartnerId } from '@/lib/mockData';
 
 export default function NewRestaurantPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+
+    if (user && user.role !== 'partner') {
+      router.push('/');
+    }
+  }, [user, authLoading, router]);
 
   const handleSubmit = async (data: Partial<Restaurant>) => {
     setIsLoading(true);
 
-    // Mock API call for Phase 1
-    setTimeout(() => {
-        const newRestaurant = {
-            ...data,
-            ownerUserId: mockCurrentPartnerId, // Assign current partner as owner
-            id: Date.now().toString(), // Generate temporary ID for Phase 1
-            rating: 0, // New restaurants start with no rating
-        };
-            console.log('Restaurant created:', newRestaurant);
-            // In Phase 2, this will call: await fetch('/api/restaurants', { method: 'POST', ... })
-            alert('Restaurant created successfully!');
-            router.push('/restaurants/manage');
-            setIsLoading(false);
-        }, 1000);
-};
+    try {
+      const response = await fetch('/api/restaurants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Failed to create restaurant');
+      }
+
+      alert('Restaurant created successfully!');
+      router.push('/restaurants/manage');
+    } catch (error: any) {
+      alert(error.message || 'Failed to create restaurant. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-orange-50 flex items-center justify-center">
+        <div className="text-xl text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== 'partner') {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-orange-50 py-12 px-4">
